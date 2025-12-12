@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { Copy, Download, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
+import { Copy, RefreshCw, Sparkles } from 'lucide-react';
 import { type GeneratedContent } from '../lib/gemini';
-import { GapAnalysis } from './GapAnalysis';
 import { PPTGenerator } from './PPTGenerator';
 
 interface Props {
@@ -13,46 +11,25 @@ interface Props {
 export function ResultDisplay({ content, onReset }: Props) {
     const [copied, setCopied] = useState(false);
 
-    // Convert structured content back to Markdown for display if needed, 
-    // or render sections individually. We will render sections individually for better UI.
+    // [에러 방지] 데이터가 없거나 프로젝트 배열이 깨졌을 경우 안전하게 처리
+    if (!content || !content.projects) {
+        return (
+            <div className="text-center py-10">
+                <p className="text-red-500 mb-4">데이터를 불러오는 데 실패했습니다.</p>
+                <button onClick={onReset} className="px-4 py-2 bg-slate-200 rounded">다시 시도</button>
+            </div>
+        );
+    }
 
     const handleCopy = () => {
-        // Reconstruct a markdown string for copying
         const md = `
-# 자기 소개
-${content.intro}
-
-# 주요 핵심 역량
-${content.keyMatches.map(m => `- **${m.skill}**: ${m.evidence}`).join('\n')}
-
-# 커버 레터
-${content.coverLetter}
-    `;
+# 지원자: ${content.candidateName}
+# 비전: ${content.vision}
+${content.projects.map(p => `## ${p.title}\n- 요약: ${p.summary}`).join('\n')}
+        `;
         navigator.clipboard.writeText(md);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handleDownload = () => {
-        const md = `
-# 자기 소개
-${content.intro}
-
-# 주요 핵심 역량
-${content.keyMatches.map(m => `- **${m.skill}**: ${m.evidence}`).join('\n')}
-
-# 커버 레터
-${content.coverLetter}
-    `;
-        const blob = new Blob([md], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'tailored-portfolio.md';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     };
 
     return (
@@ -60,74 +37,71 @@ ${content.coverLetter}
             <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-20 z-40 gap-4">
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Sparkles size={20} className="text-blue-600" />
-                    <span>생성된 결과물</span>
+                    <span>생성된 포트폴리오 (보고서형)</span>
                 </h2>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2">
                     <PPTGenerator content={content} />
-                    <button
-                        onClick={handleCopy}
-                        className="flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors active:scale-95"
-                    >
-                        {copied ? <CheckCircle2 size={16} className="text-green-600" /> : <Copy size={16} />}
-                        {copied ? '복사됨!' : '복사'}
+                    <button onClick={handleCopy} className="px-4 py-2 border rounded hover:bg-slate-50 text-sm">
+                        {copied ? "복사됨" : "텍스트 복사"}
                     </button>
-                    <button
-                        onClick={handleDownload}
-                        className="flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors active:scale-95"
-                    >
-                        <Download size={16} />
-                        MD 다운로드
+                    <button onClick={onReset} className="px-4 py-2 text-slate-500 hover:text-blue-600">
+                        <RefreshCw size={18} />
                     </button>
                 </div>
             </div>
 
-            <GapAnalysis gapAnalysis={content.gapAnalysis} />
+            {/* 웹 미리보기 (PDF 보고서 스타일) */}
+            <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-100 min-h-[600px]">
+                <div className="border-b pb-4 mb-6">
+                    <h1 className="text-3xl font-bold text-slate-900">{content.candidateName}</h1>
+                    <p className="text-slate-500">{content.targetPosition} 지원 포트폴리오</p>
+                </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden ring-1 ring-slate-900/5 p-8 md:p-12 space-y-10">
+                <div className="mb-10 p-6 bg-slate-50 rounded-xl border border-slate-200">
+                    <h3 className="font-bold text-lg mb-2 text-blue-900">Future Vision</h3>
+                    <p className="text-slate-700 leading-relaxed">{content.vision}</p>
+                </div>
 
-                <section>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2">자기 소개</h3>
-                    <div className="prose prose-slate prose-blue max-w-none">
-                        <ReactMarkdown>{content.intro}</ReactMarkdown>
-                    </div>
-                </section>
-
-                <section>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2">주요 핵심 역량</h3>
-                    <div className="grid gap-4">
-                        {content.keyMatches.map((match, i) => (
-                            <div key={i} className="flex gap-4">
-                                <div className="flex-none mt-1">
-                                    <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                                        {i + 1}
-                                    </div>
-                                </div>
+                <div className="space-y-12">
+                    {/* [에러 방지] projects가 있을 때만 map 실행 */}
+                    {content.projects?.map((proj, i) => (
+                        <div key={i} className="border border-slate-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h4 className="font-bold text-slate-800">{match.skill}</h4>
-                                    <p className="text-slate-600">{match.evidence}</p>
+                                    <h3 className="text-xl font-bold text-slate-900">
+                                        {i + 1}. {proj.title}
+                                    </h3>
+                                    <span className="text-sm text-slate-500">{proj.period}</span>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </section>
+                            
+                            <div className="bg-blue-50 p-4 rounded-lg text-blue-900 mb-6 text-sm">
+                                <strong>Summary:</strong> {proj.summary}
+                            </div>
+                            
+                            {/* 3단계 프로세스 도식 */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-6">
+                                {proj.processSteps?.map((step, idx) => (
+                                    <div key={idx} className="relative bg-white border border-slate-300 p-3 text-center rounded shadow-sm">
+                                        <div className="text-xs font-bold text-slate-400 mb-1">STEP {idx + 1}</div>
+                                        <div className="text-sm font-semibold text-slate-800">{step}</div>
+                                    </div>
+                                ))}
+                            </div>
 
-                <section>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2">커버 레터</h3>
-                    <div className="prose prose-slate prose-blue max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100">
-                        <ReactMarkdown>{content.coverLetter}</ReactMarkdown>
-                    </div>
-                </section>
-
-            </div>
-
-            <div className="flex justify-center pt-8 pb-20">
-                <button
-                    onClick={onReset}
-                    className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors font-medium px-6 py-3 hover:bg-slate-50 rounded-xl"
-                >
-                    <RefreshCw size={18} />
-                    다시 시작하기
-                </button>
+                            {/* 주요 질문 (Q&A) */}
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-slate-700 border-l-4 border-blue-500 pl-2">직면했던 주요 이슈 & 해결</h4>
+                                {proj.keyQuestions?.map((q, qIdx) => (
+                                    <div key={qIdx} className="bg-slate-50 p-3 rounded">
+                                        <div className="text-sm font-bold text-slate-800 mb-1">Q. {q.question}</div>
+                                        <div className="text-sm text-slate-600">A. {q.answer}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
